@@ -12,7 +12,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/placement-drives")
-@CrossOrigin(origins = "*")
 public class PlacementDriveController {
 
     private final PlacementDriveService placementDriveService;

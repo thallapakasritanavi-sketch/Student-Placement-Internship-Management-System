@@ -14,6 +14,13 @@ cloudflared.exe
 *.log
 tunnel.log
 
+# Secrets & local environment — NEVER commit these
+.env
+*.env
+application-local.properties
+*.jks
+*.p12
+
 # IDE files
 .idea/
 *.iml

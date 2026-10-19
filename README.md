@@ -132,6 +132,22 @@ http://localhost:8080
 
 ## 🧪 Running Automated Tests
 ```powershell
-& "$env:LOCALAPPDATA\Programs\Maven\apache-maven-3.9.6\bin\mvn.cmd" test
+mvn test
 ```
 All automated unit and integration tests run on the in-memory H2 profile to guarantee zero external dependency during build and continuous testing.
+
+---
+
+## ☁️ Cloud Deployment on Railway
+
+1. **Push your repository to GitHub** (ensure `.env` and secrets are never committed).
+2. **Log in to [railway.app](https://railway.app)** using your GitHub account.
+3. Click **"New Project"** -> **"Deploy from GitHub repo"** and select this repository.
+4. Click **"+ New"** -> **"Database"** -> **"Add MySQL"**.
+5. Under your application service settings, link the following environment variable names using Railway reference syntax:
+   - `MYSQLHOST` = `${{MySQL.MYSQLHOST}}`
+   - `MYSQLPORT` = `${{MySQL.MYSQLPORT}}`
+   - `MYSQLDATABASE` = `${{MySQL.MYSQLDATABASE}}`
+   - `MYSQLUSER` = `${{MySQL.MYSQLUSER}}`
+   - `MYSQLPASSWORD` = `${{MySQL.MYSQLPASSWORD}}`
+6. Under **Service Settings** -> **Networking**, click **"Generate Domain"** to produce your public HTTPS URL.

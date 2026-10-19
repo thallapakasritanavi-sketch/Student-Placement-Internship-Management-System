@@ -13,7 +13,12 @@ const API = {
         localStorage.setItem('placement_user', JSON.stringify(user));
     },
 
-    logout() {
+    async logout() {
+        try {
+            await fetch(this.baseUrl + '/auth/logout', { method: 'POST', credentials: 'include' });
+        } catch (e) {
+            // Ignore error if already logged out or network down
+        }
         localStorage.removeItem('placement_user');
         window.location.href = '/login.html';
     },
@@ -41,6 +46,7 @@ const API = {
         };
 
         const config = {
+            credentials: 'include', // Ensure session cookies are sent across same-origin and verified CORS origins
             ...options,
             headers: {
                 ...defaultHeaders,
