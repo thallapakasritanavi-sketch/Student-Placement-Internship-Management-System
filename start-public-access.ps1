@@ -39,9 +39,25 @@ $javaProcess = $null
 if ($portInUse) {
     Write-Host "[2/3] Backend server is already running and active on port 8080." -ForegroundColor Green
 } else {
-    Write-Host "[2/3] Starting backend application on port 8080 (In-Memory H2 DB)..." -ForegroundColor Yellow
-    $javaProcess = Start-Process -FilePath "java" -ArgumentList "-Dspring.profiles.active=h2", "-jar", "`"$JarPath`"" -PassThru -WindowStyle Minimized
-    
+    # Detect MySQL availability and start backend accordingly
+    $mysqlRunning = $false
+    try {
+        $myTcp = New-Object System.Net.Sockets.TcpClient
+        $myTcp.Connect("127.0.0.1", 3306)
+        $myTcp.Close()
+        $mysqlRunning = $true
+    } catch {
+        $mysqlRunning = $false
+    }
+
+    if ($mysqlRunning) {
+        Write-Host "[2/3] Starting backend with persistent MySQL database..." -ForegroundColor Green
+        $javaProcess = Start-Process -FilePath "java" -ArgumentList "-jar", "`"$JarPath`"" -PassThru -WindowStyle Minimized
+    } else {
+        Write-Host "[2/3] Starting backend application on port 8080 (In-Memory H2 DB)..." -ForegroundColor Yellow
+        $javaProcess = Start-Process -FilePath "java" -ArgumentList "-Dspring.profiles.active=h2", "-jar", "`"$JarPath`"" -PassThru -WindowStyle Minimized
+    }
+
     # Wait for app to be ready
     Write-Host "      Waiting for server to become ready..." -NoNewline
     $ready = $false
