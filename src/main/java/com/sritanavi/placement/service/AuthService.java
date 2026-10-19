@@ -81,7 +81,11 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getFullName().trim());
         user.setPhone(request.getPhone());
-        user.setRole(request.getRole() != null ? request.getRole() : Role.STUDENT);
+        Role role = request.getRole();
+        if (role == Role.ADMIN) {
+            role = Role.STUDENT; // Security: Disallow self-registration as ADMIN
+        }
+        user.setRole(role != null ? role : Role.STUDENT);
 
         User savedUser = userRepository.save(user);
         Long studentId = null;

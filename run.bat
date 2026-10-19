@@ -7,7 +7,7 @@ echo.
 
 cd /d "%~dp0"
 
-echo Running application...
-java -Dspring.profiles.active=h2 -jar target\placement-system-1.0.0.jar
+echo Running application with MySQL database...
+java -jar target\placement-system-1.0.0.jar
 
 pause
