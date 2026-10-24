@@ -2,6 +2,7 @@ package com.sritanavi.placement.config;
 
 import com.sritanavi.placement.entity.*;
 import com.sritanavi.placement.repository.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -9,9 +10,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
+
+    @Value("${app.admin.name:Sri Tanavi}")
+    private String adminName;
+
+    @Value("${app.admin.email:sri}")
+    private String adminEmail;
+
+    @Value("${app.admin.password:admin123}")
+    private String adminPassword;
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
@@ -49,6 +60,9 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        // Synchronize / update existing Admin account if already present in database
+        synchronizeAdminAccount();
+
         if (userRepository.count() > 0) {
             return; // Data already exists
         }
@@ -57,9 +71,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // 1. Create Admin
         User admin = new User();
-        admin.setEmail("admin@placement.com");
-        admin.setPassword(passwordEncoder.encode("admin123"));
-        admin.setFullName("Prof. Rajesh Kumar (Placement Officer)");
+        admin.setEmail(adminEmail.trim().toLowerCase());
+        admin.setPassword(passwordEncoder.encode(adminPassword));
+        admin.setFullName(adminName.trim());
         admin.setPhone("+91 9876543210");
         admin.setRole(Role.ADMIN);
         userRepository.save(admin);
@@ -237,5 +251,46 @@ public class DataInitializer implements CommandLineRunner {
                 false, "DRIVE"));
 
         System.out.println(">>> Sample data initialization completed successfully!");
+    }
+
+    private void synchronizeAdminAccount() {
+        List<User> existingAdmins = userRepository.findByRole(Role.ADMIN);
+        if (!existingAdmins.isEmpty()) {
+            User admin = existingAdmins.get(0);
+            boolean updated = false;
+
+            // 1. Synchronize display name
+            if (adminName != null && !adminName.trim().isEmpty() && !adminName.trim().equals(admin.getFullName())) {
+                admin.setFullName(adminName.trim());
+                updated = true;
+            }
+
+            // 2. Synchronize email if changed and target email is not used by another account
+            if (adminEmail != null && !adminEmail.trim().isEmpty()) {
+                String targetEmail = adminEmail.trim().toLowerCase();
+                if (!targetEmail.equalsIgnoreCase(admin.getEmail())) {
+                    boolean emailTaken = userRepository.findByEmail(targetEmail)
+                            .map(u -> !u.getId().equals(admin.getId()))
+                            .orElse(false);
+                    if (!emailTaken) {
+                        admin.setEmail(targetEmail);
+                        updated = true;
+                    }
+                }
+            }
+
+            // 3. Synchronize password if custom password provided and different
+            if (adminPassword != null && !adminPassword.isBlank()) {
+                if (!passwordEncoder.matches(adminPassword, admin.getPassword())) {
+                    admin.setPassword(passwordEncoder.encode(adminPassword));
+                    updated = true;
+                }
+            }
+
+            if (updated) {
+                userRepository.save(admin);
+                System.out.println(">>> Existing Admin account synchronized safely (Display Name: " + admin.getFullName() + ")");
+            }
+        }
     }
 }

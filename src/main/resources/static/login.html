@@ -37,10 +37,10 @@
 
                     <form id="login-form">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Email address</label>
+                            <label class="form-label fw-semibold">Email address or Login Name</label>
                             <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                                <input type="email" class="form-control" id="email" required placeholder="name@placement.com">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <input type="text" class="form-control" id="email" required placeholder="sri or name@placement.com">
                             </div>
                         </div>
 
@@ -72,8 +72,11 @@
     <script>
         function fillDemo(type) {
             if (type === 'admin') {
-                document.getElementById('email').value = 'admin@placement.com';
-                document.getElementById('password').value = 'admin123';
+                document.getElementById('email').value = 'sri';
+                const pwdInput = document.getElementById('password');
+                pwdInput.value = '';
+                pwdInput.focus();
+                API.showToast('Admin login name (sri) filled. Enter your password to sign in.', 'info');
             } else {
                 document.getElementById('email').value = 'student@placement.com';
                 document.getElementById('password').value = 'student123';

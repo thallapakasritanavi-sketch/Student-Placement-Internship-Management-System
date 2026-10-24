@@ -120,9 +120,9 @@ Write-Host ""
 Write-Host "====================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "DEMO LOGIN CREDENTIALS:" -ForegroundColor Yellow
-Write-Host "  Admin   : admin@placement.com     / admin123"
-Write-Host "  Student : student@placement.com   / student123"
-Write-Host "  Student : ananya.verma@placement.com / student123"
+Write-Host "  Admin (Sri Tanavi) : sri / [Configured Admin Password]"
+Write-Host "  Student            : student@placement.com        / student123"
+Write-Host "  Student            : ananya.verma@placement.com    / student123"
 Write-Host ""
 Write-Host "Keep this window open while sharing. Press Ctrl+C to stop." -ForegroundColor Magenta
 Write-Host ""

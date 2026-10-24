@@ -40,9 +40,9 @@ A production-ready, full-stack campus recruitment and internship management web 
 
 ## 🔑 Demo Login Credentials
 
-| Role | Email | Password | Dashboard URL |
+| Role | Login Name / Email | Password | Dashboard URL |
 | :--- | :--- | :--- | :--- |
-| **Admin / Placement Officer** | `admin@placement.com` | `admin123` | `/admin-dashboard.html` |
+| **Admin / Placement Officer (Sri Tanavi)** | `sri` | Configured Admin Password (or `admin123` default) | `/admin-dashboard.html` |
 | **Student (Demo)** | `student@placement.com` | `student123` | `/student-dashboard.html` |
 | **Student 2 (Ananya)** | `ananya.verma@placement.com` | `student123` | `/student-dashboard.html` |
 | **Student 3 (Rohan)** | `rohan.patel@placement.com` | `student123` | `/student-dashboard.html` |

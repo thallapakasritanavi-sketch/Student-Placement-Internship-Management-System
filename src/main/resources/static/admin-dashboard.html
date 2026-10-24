@@ -19,8 +19,8 @@
             <div class="d-flex align-items-center gap-3 ms-auto">
                 <div class="dropdown">
                     <button class="btn btn-light dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown">
-                        <div class="profile-avatar mb-0 bg-danger text-white" style="width: 32px; height: 32px; font-size: 1rem;">A</div>
-                        <span class="fw-semibold d-none d-md-inline" id="admin-nav-name">Admin Officer</span>
+                        <div class="profile-avatar mb-0 bg-danger text-white" id="admin-nav-avatar" style="width: 32px; height: 32px; font-size: 0.9rem;">ST</div>
+                        <span class="fw-semibold d-none d-md-inline" id="admin-nav-name">Sri Tanavi</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow">
                         <li><a class="dropdown-item" href="javascript:void(0)" onclick="showAdminSection('dashboard')"><i class="bi bi-speedometer2 me-2"></i> Overview</a></li>
@@ -37,9 +37,9 @@
         <!-- Sidebar Navigation -->
         <aside class="dashboard-sidebar">
             <div class="sidebar-profile">
-                <div class="profile-avatar bg-danger text-white">A</div>
-                <h6 class="fw-bold mb-1" id="admin-sidebar-name">Admin Officer</h6>
-                <p class="text-muted small mb-0">Placement Cell Coordinator</p>
+                <div class="profile-avatar bg-danger text-white" id="admin-sidebar-avatar">ST</div>
+                <h6 class="fw-bold mb-1" id="admin-sidebar-name">Sri Tanavi</h6>
+                <p class="text-muted small mb-0">Placement Officer</p>
             </div>
 
             <ul class="sidebar-menu">
@@ -606,8 +606,16 @@
             currentAdmin = API.requireRole('ADMIN');
             if (!currentAdmin) return;
 
-            document.getElementById('admin-nav-name').innerText = currentAdmin.fullName;
-            document.getElementById('admin-sidebar-name').innerText = currentAdmin.fullName;
+            const displayName = currentAdmin.fullName || 'Sri Tanavi';
+            document.getElementById('admin-nav-name').innerText = displayName;
+            document.getElementById('admin-sidebar-name').innerText = displayName;
+
+            // Generate avatar initials from name (e.g. "Sri Tanavi" -> "ST")
+            const initials = displayName.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'ST';
+            const navAvatar = document.getElementById('admin-nav-avatar');
+            if (navAvatar) navAvatar.innerText = initials;
+            const sidebarAvatar = document.getElementById('admin-sidebar-avatar');
+            if (sidebarAvatar) sidebarAvatar.innerText = initials;
 
             jobModalInstance = new bootstrap.Modal(document.getElementById('jobModal'));
             internModalInstance = new bootstrap.Modal(document.getElementById('internshipModal'));

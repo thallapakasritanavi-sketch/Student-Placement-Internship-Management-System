@@ -6,6 +6,7 @@ import com.sritanavi.placement.dto.AuthDto;
 import com.sritanavi.placement.entity.ApplicationStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -30,6 +31,12 @@ public class SecurityAuthorizationTests {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Value("${app.admin.email:sri}")
+    private String adminEmail;
+
+    @Value("${app.admin.password:admin123}")
+    private String adminPassword;
 
     @Test
     void testUnauthenticatedUserCannotAccessProtectedEndpoints() throws Exception {
@@ -78,7 +85,7 @@ public class SecurityAuthorizationTests {
     @Test
     void testSessionLoginAndAccessFlow() throws Exception {
         // 1. Post login with valid credentials (from DataInitializer demo admin)
-        AuthDto.LoginRequest loginReq = new AuthDto.LoginRequest("admin@placement.com", "admin123");
+        AuthDto.LoginRequest loginReq = new AuthDto.LoginRequest(adminEmail, adminPassword);
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginReq)))

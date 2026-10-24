@@ -138,9 +138,9 @@ Whenever you make improvements or changes to your project:
 
 ## 🔑 Demo Login Credentials for Public Evaluators
 
-| Role | Email | Password | Allowed Operations |
+| Role | Login Name / Email | Password | Allowed Operations |
 | :--- | :--- | :--- | :--- |
-| **Admin / Placement Officer** | `admin@placement.com` | `admin123` | Analytics dashboard, manage student database, post jobs/internships, schedule interviews, coordinate drives |
+| **Admin / Placement Officer (Sri Tanavi)** | `sri` | Configured Admin Password (or `admin123` default) | Analytics dashboard, manage student database, post jobs/internships, schedule interviews, coordinate drives |
 | **Student (Demo Account)** | `student@placement.com` | `student123` | Update academic profile, browse jobs & internships, 1-click apply, live application status tracking, notifications |
 | **Student 2 (Ananya Verma)** | `ananya.verma@placement.com` | `student123` | View shortlisted application records & interview calls |
 | **Recruiter** | Register directly via `/register.html` | Your chosen password | Post company openings, review applicants |

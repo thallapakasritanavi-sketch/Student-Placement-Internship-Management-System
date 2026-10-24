@@ -58,6 +58,15 @@ public class AuthAndApplicationServiceTests {
     }
 
     @Test
+    void testAdminLoginReturnsSriTanaviProfile() {
+        AuthDto.LoginRequest loginReq = new AuthDto.LoginRequest("sri", "admin123");
+        AuthDto.AuthResponse loginRes = authService.login(loginReq);
+        Assertions.assertEquals("Sri Tanavi", loginRes.getFullName());
+        Assertions.assertEquals("ADMIN", loginRes.getRole());
+        Assertions.assertEquals("/admin/dashboard", loginRes.getRedirectUrl());
+    }
+
+    @Test
     void testJobCreationAndDuplicateApplicationPrevention() {
         // Create Job
         JobDto jobDto = new JobDto();
