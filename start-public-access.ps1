@@ -1,5 +1,5 @@
 # ==============================================================================
-# Student Placement & Internship Management System - Branded Public Website
+# Student Placement & Internship Management System - Public Website Launcher
 # ==============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -7,7 +7,7 @@ $WorkingDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $WorkingDir
 
 Write-Host "====================================================================" -ForegroundColor Cyan
-Write-Host "   Student Placement & Internship Management System - Branded Public Web" -ForegroundColor Yellow
+Write-Host "  Student Placement & Internship Management System - Public Web" -ForegroundColor Yellow
 Write-Host "====================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -21,10 +21,10 @@ if (-not (Test-Path $JarPath)) {
         exit 1
     }
 } else {
-    Write-Host "[1/3] Application package target\placement-system-1.0.0.jar verified." -ForegroundColor Green
+    Write-Host "[1/3] Application JAR verified: target\placement-system-1.0.0.jar" -ForegroundColor Green
 }
 
-# 2. Check if port 8080 is already open or start Java app
+# 2. Check if port 8080 is already in use
 $portInUse = $false
 try {
     $tcp = New-Object System.Net.Sockets.TcpClient
@@ -37,9 +37,9 @@ try {
 
 $javaProcess = $null
 if ($portInUse) {
-    Write-Host "[2/3] Backend server is already running and active on port 8080." -ForegroundColor Green
+    Write-Host "[2/3] Backend already running on port 8080." -ForegroundColor Green
 } else {
-    # Detect MySQL availability and start backend accordingly
+    # Detect MySQL availability
     $mysqlRunning = $false
     try {
         $myTcp = New-Object System.Net.Sockets.TcpClient
@@ -51,17 +51,17 @@ if ($portInUse) {
     }
 
     if ($mysqlRunning) {
-        Write-Host "[2/3] Starting backend with persistent MySQL database..." -ForegroundColor Green
+        Write-Host "[2/3] MySQL detected. Starting backend with persistent MySQL database..." -ForegroundColor Green
         $javaProcess = Start-Process -FilePath "java" -ArgumentList "-jar", "`"$JarPath`"" -PassThru -WindowStyle Minimized
     } else {
-        Write-Host "[2/3] Starting backend application on port 8080 (In-Memory H2 DB)..." -ForegroundColor Yellow
+        Write-Host "[2/3] MySQL not detected. Starting backend with in-memory H2 database..." -ForegroundColor Yellow
         $javaProcess = Start-Process -FilePath "java" -ArgumentList "-Dspring.profiles.active=h2", "-jar", "`"$JarPath`"" -PassThru -WindowStyle Minimized
     }
 
-    # Wait for app to be ready
-    Write-Host "      Waiting for server to become ready..." -NoNewline
+    # Wait for app to be ready (up to 60 seconds)
+    Write-Host "      Waiting for server to start..." -NoNewline
     $ready = $false
-    for ($i = 0; $i -lt 30; $i++) {
+    for ($i = 0; $i -lt 60; $i++) {
         Start-Sleep -Seconds 1
         Write-Host "." -NoNewline
         try {
@@ -74,59 +74,71 @@ if ($portInUse) {
     }
     Write-Host ""
     if (-not $ready) {
-        Write-Host "Warning: Backend might still be starting, continuing to tunnel..." -ForegroundColor Yellow
+        Write-Host "      Warning: Server may still be starting. Continuing to tunnel..." -ForegroundColor Yellow
     } else {
         Write-Host "      Backend is healthy and responding!" -ForegroundColor Green
     }
 }
 
-# 3. Start Branded Public Subdomain Tunnel
-Write-Host "[3/3] Establishing branded public domain tunnel..." -ForegroundColor Yellow
+# 3. Start localtunnel for public access
+Write-Host "[3/3] Creating public tunnel..." -ForegroundColor Yellow
 $subdomain = "student-placement-internship-system"
 $tunnelLog = Join-Path $WorkingDir "tunnel.log"
 if (Test-Path $tunnelLog) { Remove-Item $tunnelLog -Force }
 
-# Launch localtunnel with custom subdomain
-$tunnelProc = Start-Process -FilePath "npx.cmd" -ArgumentList "--yes", "localtunnel", "--port", "8080", "--subdomain", $subdomain -RedirectStandardOutput $tunnelLog -RedirectStandardError $tunnelLog -PassThru -WindowStyle Hidden
+$tunnelErrLog = Join-Path $WorkingDir "tunnel-err.log"
+if (Test-Path $tunnelErrLog) { Remove-Item $tunnelErrLog -Force }
 
-Start-Sleep -Seconds 3
+$tunnelProc = Start-Process -FilePath "npx.cmd" `
+    -ArgumentList "--yes", "localtunnel", "--port", "8080", "--subdomain", $subdomain `
+    -RedirectStandardOutput $tunnelLog `
+    -RedirectStandardError $tunnelErrLog `
+    -PassThru -WindowStyle Hidden
 
-# Fetch public IP password
+Start-Sleep -Seconds 5
+
+# Fetch tunnel bypass password
 $tunnelPassword = ""
 try {
-    $tunnelPassword = (Invoke-WebRequest -Uri "https://loca.lt/mytunnelpassword" -UseBasicParsing -TimeoutSec 3).Content.Trim()
+    $tunnelPassword = (Invoke-WebRequest -Uri "https://loca.lt/mytunnelpassword" -UseBasicParsing -TimeoutSec 5).Content.Trim()
 } catch {}
 
 $publicUrl = "https://$subdomain.loca.lt"
 
 Write-Host ""
 Write-Host "====================================================================" -ForegroundColor Green
-Write-Host "   🎉 SUCCESS! YOUR BRANDED WEBSITE IS NOW LIVE ONLINE:" -ForegroundColor Green
+Write-Host "  SUCCESS! YOUR WEBSITE IS NOW LIVE ONLINE:" -ForegroundColor Green
 Write-Host ""
-Write-Host "   🔗 Website URL:  $publicUrl" -ForegroundColor Cyan
+Write-Host "  Website URL : $publicUrl" -ForegroundColor Cyan
+
 if ($tunnelPassword) {
-    Write-Host "   🔑 First-Time Visitor Password:  $tunnelPassword" -ForegroundColor Yellow
-    Write-Host "      (If prompted by the tunnel, enter this password and click Submit)" -ForegroundColor Gray
+    Write-Host "  Tunnel Password : $tunnelPassword" -ForegroundColor Yellow
+    Write-Host "  (If the browser shows a tunnel page, enter this password and click Submit)" -ForegroundColor Gray
 }
+
 Write-Host ""
 Write-Host "====================================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "DEMO CREDENTIALS FOR TESTING:" -ForegroundColor Yellow
-Write-Host "  * Admin / Placement Officer:  admin@placement.com     /  admin123"
-Write-Host "  * Student Demo Account:       student@placement.com   /  student123"
-Write-Host "  * Student 2 (Ananya):         ananya.verma@placement.com / student123"
+Write-Host "DEMO LOGIN CREDENTIALS:" -ForegroundColor Yellow
+Write-Host "  Admin   : admin@placement.com     / admin123"
+Write-Host "  Student : student@placement.com   / student123"
+Write-Host "  Student : ananya.verma@placement.com / student123"
 Write-Host ""
-Write-Host "Keep this window open while you want the website to be active." -ForegroundColor Magenta
-Write-Host "Press Ctrl+C or close this window to stop sharing." -ForegroundColor Gray
+Write-Host "Keep this window open while sharing. Press Ctrl+C to stop." -ForegroundColor Magenta
 Write-Host ""
 
 Start-Process $publicUrl
 
 try {
     while (-not $tunnelProc.HasExited) {
-        Start-Sleep -Seconds 1
+        Start-Sleep -Seconds 2
     }
 } finally {
-    if (-not $tunnelProc.HasExited) { Stop-Process -Id $tunnelProc.Id -Force }
-    if ($javaProcess -and (-not $javaProcess.HasExited)) { Stop-Process -Id $javaProcess.Id -Force }
+    if (-not $tunnelProc.HasExited) {
+        Stop-Process -Id $tunnelProc.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($javaProcess -and (-not $javaProcess.HasExited)) {
+        Stop-Process -Id $javaProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    Write-Host "Tunnel and application stopped." -ForegroundColor Gray
 }
