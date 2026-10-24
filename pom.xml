@@ -35,6 +35,12 @@
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
 
+		<!-- Actuator — exposes /actuator/health for Railway health probes -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 		<!-- Database Drivers -->
 		<dependency>
 			<groupId>com.mysql</groupId>

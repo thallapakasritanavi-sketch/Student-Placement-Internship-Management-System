@@ -148,6 +148,11 @@ public class SecurityConfig {
                     "/error"
                 ).permitAll()
 
+                // ── Health check — public so Railway probes work without a session ──
+                .requestMatchers("/actuator/health").permitAll()
+                // Block all other actuator endpoints
+                .requestMatchers("/actuator/**").denyAll()
+
                 // ── Authentication endpoints (login, register) — must be public ───
                 .requestMatchers("/api/auth/**").permitAll()
 
