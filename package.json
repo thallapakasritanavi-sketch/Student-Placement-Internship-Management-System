@@ -1,0 +1,9 @@
+{
+  "name": "student-placement-and-internship-management",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Student Placement and Internship Management System - Live Web Application",
+  "scripts": {
+    "build": "node build-static.js"
+  }
+}
