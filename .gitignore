@@ -13,6 +13,8 @@ buildNumber.properties
 cloudflared.exe
 *.log
 tunnel.log
+*.bak
+
 
 # Secrets & local environment — NEVER commit these
 .env
