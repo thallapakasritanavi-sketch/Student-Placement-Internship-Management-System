@@ -1,9 +1,4 @@
 {
-  "version": 2,
-  "buildCommand": "node build-static.js",
   "outputDirectory": "dist",
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/", "destination": "/index.html" }
-  ]
+  "cleanUrls": true
 }
