@@ -65,7 +65,7 @@ if ($portInUse) {
         Start-Sleep -Seconds 1
         Write-Host "." -NoNewline
         try {
-            $response = Invoke-WebRequest -Uri "http://localhost:8080" -UseBasicParsing -TimeoutSec 2 -ErrorAction SilentlyContinue
+            $response = Invoke-WebRequest -Uri "http://localhost:8080/login.html" -UseBasicParsing -TimeoutSec 2 -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
                 $ready = $true
                 break
@@ -80,40 +80,75 @@ if ($portInUse) {
     }
 }
 
-# 3. Start localtunnel for public access
-Write-Host "[3/3] Creating public tunnel..." -ForegroundColor Yellow
-$subdomain = "student-placement-internship-system"
-$tunnelLog = Join-Path $WorkingDir "tunnel.log"
-if (Test-Path $tunnelLog) { Remove-Item $tunnelLog -Force }
-
-$tunnelErrLog = Join-Path $WorkingDir "tunnel-err.log"
-if (Test-Path $tunnelErrLog) { Remove-Item $tunnelErrLog -Force }
-
-$tunnelProc = Start-Process -FilePath "npx.cmd" `
-    -ArgumentList "--yes", "localtunnel", "--port", "8080", "--subdomain", $subdomain `
-    -RedirectStandardOutput $tunnelLog `
-    -RedirectStandardError $tunnelErrLog `
-    -PassThru -WindowStyle Hidden
-
-Start-Sleep -Seconds 5
-
-# Fetch tunnel bypass password
+# 3. Start Public Tunnel (Cloudflare Tunnel preferred, Localtunnel fallback)
+Write-Host "[3/3] Creating secure public tunnel for all devices..." -ForegroundColor Yellow
+$cfExe = Join-Path $WorkingDir "cloudflared.exe"
+$publicUrl = ""
 $tunnelPassword = ""
-try {
-    $tunnelPassword = (Invoke-WebRequest -Uri "https://loca.lt/mytunnelpassword" -UseBasicParsing -TimeoutSec 5).Content.Trim()
-} catch {}
+$tunnelProc = $null
 
-$publicUrl = "https://$subdomain.loca.lt"
+if (Test-Path $cfExe) {
+    Write-Host "      Using Cloudflare Tunnel (fast, secure, no password required)..." -ForegroundColor Cyan
+    $cfLog = Join-Path $WorkingDir "cf-tunnel.log"
+    if (Test-Path $cfLog) { Remove-Item $cfLog -Force }
+
+    $tunnelProc = Start-Process -FilePath $cfExe `
+        -ArgumentList "tunnel", "--url", "http://localhost:8080", "--no-autoupdate" `
+        -RedirectStandardError $cfLog `
+        -PassThru -WindowStyle Hidden
+
+    for ($t = 0; $t -lt 30; $t++) {
+        Start-Sleep -Seconds 1
+        Write-Host "." -NoNewline
+        if (Test-Path $cfLog) {
+            $logContent = Get-Content $cfLog -Raw -ErrorAction SilentlyContinue
+            if ($logContent -match "(https://[a-zA-Z0-9-]+\.trycloudflare\.com)") {
+                $publicUrl = $matches[1]
+                break
+            }
+        }
+    }
+    Write-Host ""
+}
+
+# Fallback to localtunnel if cloudflared didn't produce a URL
+if (-not $publicUrl) {
+    Write-Host "      Cloudflare not available, launching Localtunnel fallback..." -ForegroundColor Yellow
+    $subdomain = "student-placement-internship-system"
+    $tunnelLog = Join-Path $WorkingDir "tunnel.log"
+    if (Test-Path $tunnelLog) { Remove-Item $tunnelLog -Force }
+
+    $tunnelErrLog = Join-Path $WorkingDir "tunnel-err.log"
+    if (Test-Path $tunnelErrLog) { Remove-Item $tunnelErrLog -Force }
+
+    $tunnelProc = Start-Process -FilePath "npx.cmd" `
+        -ArgumentList "--yes", "localtunnel", "--port", "8080", "--subdomain", $subdomain `
+        -RedirectStandardOutput $tunnelLog `
+        -RedirectStandardError $tunnelErrLog `
+        -PassThru -WindowStyle Hidden
+
+    Start-Sleep -Seconds 5
+    try {
+        $tunnelPassword = (Invoke-WebRequest -Uri "https://loca.lt/mytunnelpassword" -UseBasicParsing -TimeoutSec 5).Content.Trim()
+    } catch {}
+
+    $publicUrl = "https://$subdomain.loca.lt"
+}
+
+# Copy URL to clipboard for easy sharing
+try { Set-Clipboard -Value $publicUrl } catch {}
 
 Write-Host ""
 Write-Host "====================================================================" -ForegroundColor Green
-Write-Host "  SUCCESS! YOUR WEBSITE IS NOW LIVE ONLINE:" -ForegroundColor Green
+Write-Host "  SUCCESS! YOUR WEBSITE IS LIVE ONLINE FOR EVERYONE:" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Website URL : $publicUrl" -ForegroundColor Cyan
+Write-Host "  Public Website URL : $publicUrl" -ForegroundColor Cyan
+Write-Host "  (Copied to your clipboard! Send this link to anyone on phones/laptops)" -ForegroundColor Green
 
 if ($tunnelPassword) {
-    Write-Host "  Tunnel Password : $tunnelPassword" -ForegroundColor Yellow
-    Write-Host "  (If the browser shows a tunnel page, enter this password and click Submit)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  Tunnel Password    : $tunnelPassword" -ForegroundColor Yellow
+    Write-Host "  (If asked on first visit, enter this password and click Submit)" -ForegroundColor Gray
 }
 
 Write-Host ""
@@ -121,8 +156,8 @@ Write-Host "====================================================================
 Write-Host ""
 Write-Host "DEMO LOGIN CREDENTIALS:" -ForegroundColor Yellow
 Write-Host "  Admin (Sri Tanavi) : sri / [Configured Admin Password]"
-Write-Host "  Student            : student@placement.com        / student123"
-Write-Host "  Student            : ananya.verma@placement.com    / student123"
+Write-Host "  Student Demo       : student@placement.com        / student123"
+Write-Host "  Student (Ananya)   : ananya.verma@placement.com    / student123"
 Write-Host ""
 Write-Host "Keep this window open while sharing. Press Ctrl+C to stop." -ForegroundColor Magenta
 Write-Host ""
@@ -134,7 +169,7 @@ try {
         Start-Sleep -Seconds 2
     }
 } finally {
-    if (-not $tunnelProc.HasExited) {
+    if ($tunnelProc -and (-not $tunnelProc.HasExited)) {
         Stop-Process -Id $tunnelProc.Id -Force -ErrorAction SilentlyContinue
     }
     if ($javaProcess -and (-not $javaProcess.HasExited)) {

@@ -89,6 +89,7 @@ public class SecurityConfig {
                 "http://localhost:*",
                 "https://*.up.railway.app",
                 "https://*.loca.lt",
+                "https://*.trycloudflare.com",
                 "https://*.onrender.com"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
