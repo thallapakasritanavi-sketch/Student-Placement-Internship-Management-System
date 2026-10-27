@@ -1,146 +1,144 @@
-# 🌐 Student Placement & Internship Management System - Cloud Deployment Guide
+# 🚀 Production Deployment Guide: Student Placement & Internship Management System
 
-This guide provides simple, step-by-step instructions for deploying your **Student Placement & Internship Management System** as a public, secure HTTPS website accessible from any smartphone, laptop, or computer anywhere in the world.
-
----
-
-## 🏆 Recommended Hosting Platform: Railway (24/7 Cloud Hosting)
-
-**Railway** is the most seamless platform for Java Spring Boot + MySQL applications because it provides:
-- **1-Click MySQL Database**: Dedicated, persistent MySQL 8 service with automatic daily backups.
-- **Automatic GitHub CI/CD**: Every `git push` automatically rebuilds and deploys the latest version.
-- **Zero-Config Database Linking**: Railway provides standard environment variables (`MYSQLHOST`, `MYSQLPORT`, etc.) which your application is now pre-configured to automatically detect.
-- **Free Automated HTTPS Domain**: Provides instant SSL certificates (`https://xxxx.up.railway.app`).
-- **Real-Time Deployment & Application Logs**: Easy one-click log inspection directly in your browser.
+This document outlines the end-to-end instructions for deploying the **Student Placement and Internship Management System** as a secure, publicly accessible cloud website using **Vercel**, **Supabase PostgreSQL**, **Supabase Auth**, and **GitHub**.
 
 ---
 
-### 📋 Step-by-Step Railway Deployment (Takes ~5 Minutes)
+## 🏗️ 1. Architecture Overview
 
-#### Step 1: Push Your Code to GitHub
-Open PowerShell and push your latest code to your repository:
-```powershell
-cd "c:\Users\thall\OneDrive\Desktop\Student Placement & Internship Management System"
+- **Frontend Application**: React 18 + TypeScript + Vite + Tailwind CSS (SPA)
+- **Frontend Hosting**: Vercel Global Edge Network with SSL and SPA route rewrites
+- **Cloud Database**: Supabase PostgreSQL with Row Level Security (RLS)
+- **User Authentication**: Supabase Auth (Email & Password, Role-Based Access Control)
+- **Document Storage**: Supabase Storage (`resumes` bucket for student PDF/Doc files)
+- **Source Code Repository**: GitHub (`main` branch automated CI/CD)
+
+---
+
+## 📋 2. Prerequisites & Accounts
+
+1. **GitHub Account**: To host the repository and trigger automated Vercel CI/CD builds.
+2. **Vercel Account**: [vercel.com](https://vercel.com) (Log in with GitHub).
+3. **Supabase Account**: [supabase.com](https://supabase.com) (Free-tier PostgreSQL & Auth).
+
+---
+
+## 🗄️ 3. Supabase Cloud Database & Storage Setup
+
+### Step 3.1: Create a Project
+1. Log in to [supabase.com](https://supabase.com/dashboard) and click **"New Project"**.
+2. Set your **Project Name** (e.g. `student-placement-system`).
+3. Set a strong database password and choose the region closest to your users (e.g. `South Asia (Mumbai)`).
+
+### Step 3.2: Run Database Migration
+1. In your Supabase project dashboard, navigate to the **SQL Editor** from the left navigation bar.
+2. Click **"New Query"**.
+3. Open [`supabase/schema.sql`](supabase/schema.sql) from this repository, copy its entire contents, and paste them into the SQL editor.
+4. Click **Run** (or `Ctrl + Enter`).
+5. This automatically generates:
+   - `profiles`, `jobs`, `internships`, `applications`, `placement_drives`, `interviews`, `notifications`.
+   - Comprehensive **Row-Level Security (RLS)** policies for Students, Recruiters, and Administrators.
+   - The `resumes` storage bucket with upload and download policies.
+
+### Step 3.3: Copy API Credentials
+1. Go to **Project Settings** -> **API**.
+2. Note down:
+   - **Project URL** (e.g. `https://xyzcompany.supabase.co`)
+   - **Project API Keys** -> `anon` / `public` key
+
+### Step 3.4: Configure Authentication Redirect URLs
+1. Navigate to **Authentication** -> **URL Configuration**.
+2. In **Site URL**, enter your production domain (or your Vercel URL once generated).
+3. In **Redirect URLs**, add:
+   - `https://<your-project-name>.vercel.app/**`
+   - `http://localhost:3000/**`
+
+---
+
+## ☁️ 4. Deploying Frontend to Vercel
+
+### Step 4.1: Push Project to GitHub
+Open your terminal in the project root:
+```bash
 git add .
-git commit -m "Configure production Dockerfile, Railway deployment, CORS, and cloud MySQL support"
+git commit -m "Deploy modern React, TypeScript, Tailwind, and Supabase Placement System"
 git push origin main
 ```
 
-#### Step 2: Create a Project on Railway
-1. Visit **[Railway.app](https://railway.app)** and click **Login** (choose **Login with GitHub**).
-2. On your Railway dashboard, click **"New Project"**.
-3. Select **"Deploy from GitHub repo"**.
-4. Choose your repository: `Student-Placement-Internship-Management-System`.
-5. Railway will automatically detect the [`railway.json`](railway.json) and [`Dockerfile`](Dockerfile).
+### Step 4.2: Import Project in Vercel
+1. Log in to [vercel.com/dashboard](https://vercel.com/dashboard).
+2. Click **"Add New..."** -> **"Project"**.
+3. Select your repository: `Student-Placement-Internship-Management-System`.
+4. In the configuration window:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: `./`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
 
-#### Step 3: Add a Hosted MySQL Database
-1. Inside your project canvas on Railway, click **"+ New"** (top right) or press `Ctrl + K`.
-2. Select **"Database"** -> **"Add MySQL"**.
-3. Railway will provision a persistent MySQL server in ~10 seconds.
-4. Click on the MySQL service -> Go to the **Variables** tab to view your credentials (`MYSQLHOST`, `MYSQLUSER`, `MYSQLPASSWORD`, `MYSQLDATABASE`, `MYSQLPORT`).
+### Step 4.3: Configure Production Environment Variables
+Under the **Environment Variables** section on Vercel, add:
 
-#### Step 4: Link Database Variables to the Web Service
-1. Click on your **Web Service** (your GitHub repository box) on Railway.
-2. Go to the **Variables** tab.
-3. Click **"New Variable"** -> **"Add Reference"** and select:
-   - `MYSQLHOST` -> `${{MySQL.MYSQLHOST}}`
-   - `MYSQLPORT` -> `${{MySQL.MYSQLPORT}}`
-   - `MYSQLDATABASE` -> `${{MySQL.MYSQLDATABASE}}`
-   - `MYSQLUSER` -> `${{MySQL.MYSQLUSER}}`
-   - `MYSQLPASSWORD` -> `${{MySQL.MYSQLPASSWORD}}`
-   *(Or click "Raw Editor" and paste standard reference mappings).*
+| Key | Value | Description |
+| :--- | :--- | :--- |
+| `VITE_SUPABASE_URL` | `https://your-project.supabase.co` | Your Supabase Project URL |
+| `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOi...` | Your Supabase Publishable / Anon Key |
+
+> [!NOTE]
+> Even if environment variables are not immediately added, the application features an **In-Browser Fallback Engine** with complete demo profiles, jobs, applications, and interview data so visitors and evaluators never encounter a broken or blank screen.
+
+### Step 4.4: Deploy
+1. Click **"Deploy"**.
+2. Vercel will run `npm install`, compile TypeScript, build optimized production assets via Vite, and issue an SSL certificate in ~30 seconds.
+3. Your live URL will be displayed: `https://<your-project-name>.vercel.app`.
+
+---
+
+## 🌐 5. Configuring a Custom Domain (Optional)
+
+If you own a custom domain (e.g. `placements.yourcollege.edu` or `mysystem.com`):
+
+1. Go to your project on **Vercel** -> **Settings** -> **Domains**.
+2. Enter your domain name and click **Add**.
+3. Vercel will provide the exact DNS records:
+   - For an **Apex Domain** (`example.com`): An **A Record** pointing to `76.76.21.21`.
+   - For a **Subdomain** (`placements.example.com`): A **CNAME Record** pointing to `cname.vercel-dns.com`.
+4. Add these records at your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.).
+5. Vercel will automatically verify the records and provision an SSL certificate within a few minutes.
+
+---
+
+## 🔑 6. Evaluation Credentials & Test Accounts
+
+| Role | Login Identifier | Password | Key Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Placement Officer (Sri Tanavi)** | `sri` or `sri@placement.com` | `admin123` | Placement rate analytics, post openings, review applicants, schedule multi-round interviews, manage student registry |
+| **Student (Demo Account)** | `student@placement.com` | `student123` | Academic profile builder, upload PDF resume, filter eligible openings, 1-click apply, live status tracking |
+| **Student 2 (Ananya Verma)** | `ananya.verma@placement.com` | `student123` | View shortlisted application records, view scheduled interview calls |
+| **Recruiter (Google India)** | `recruiter@google.com` | `recruiter123` | Post campus roles, screen applicants, view resumes, update hiring status |
 
 > [!TIP]
-> **Want to test without MySQL first?**
-> You can simply add a single variable:
-> `SPRING_PROFILES_ACTIVE = h2`
-> This runs the application with an in-memory database and all demo data preloaded instantly!
-
-#### Step 5: Generate Your Public HTTPS Domain
-1. On your Web Service box, click **"Settings"**.
-2. Scroll to the **"Networking"** section.
-3. Under **Public Networking**, click **"Generate Domain"**.
-4. Railway will generate your live public URL, for example:
-   ```
-   https://student-placement-system-production.up.railway.app
-   ```
-5. Click the URL to open your live website in Google Chrome!
+> The login page and navigation bar include **1-Click Demo Buttons** so evaluators can instantly switch between Admin, Student, and Recruiter perspectives with a single click.
 
 ---
 
-## ☁️ Alternative Option: Render.com
+## 🛡️ 7. Security & Production Checklist
 
-Render is another popular cloud platform with direct GitHub deployment:
-
-1. Sign up / Log in to **[Render.com](https://render.com)** using your GitHub account.
-2. Click **"New +"** -> **"Web Service"**.
-3. Connect your repository: `Student-Placement-Internship-Management-System`.
-4. Render will detect [`render.yaml`](render.yaml) and [`Dockerfile`](Dockerfile).
-5. Set:
-   - **Environment**: Docker
-   - **Plan**: Free
-6. Under **Environment Variables**, if using H2 fallback, set:
-   - `SPRING_PROFILES_ACTIVE` = `h2`
-   - `PORT` = `8080`
-7. Click **"Create Web Service"**.
-8. Once built, Render will assign a public HTTPS domain: `https://your-app.onrender.com`.
+- [x] **No Secrets in Client Bundle**: Only publishable `anon` keys prefixed with `VITE_` are used. No service-role or database master passwords exist in client code.
+- [x] **Row-Level Security (RLS)**: PostgreSQL policies prevent unauthorized students from modifying others' records or viewing restricted recruiter data.
+- [x] **Clean URL Routing**: [`vercel.json`](vercel.json) redirects all route requests to `/index.html`, eliminating 404 errors on browser page reloads.
+- [x] **Zero Localhost Dependencies**: The application operates autonomously without depending on local machines or local ports.
+- [x] **Resume Protection**: File uploads are secured with format restrictions and Supabase storage bucket permissions.
 
 ---
 
-## ⚡ Option 3: Instant Local Public Access (Ready Now from Your PC)
+## 🔄 8. Ongoing Maintenance & Redeployment
 
-If you need to show your project immediately to an evaluator, teacher, or friend without setting up cloud accounts:
-
-1. Double-click the file:
-   ```
-   start-public-access.bat
-   ```
-2. It starts your local Spring Boot application and creates a secure public tunnel with a live shareable URL.
-
----
-
-## 🔒 Security & Data Persistence
-
-1. **Passwords & Secrets Protection**:
-   - Passwords are encrypted with **BCrypt** hashing.
-   - User entity has `@JsonIgnore` on the password field, ensuring credentials are never exposed through REST responses.
-   - Database credentials are read dynamically from cloud environment variables (`MYSQLHOST`, `MYSQLPASSWORD`, etc.), preventing hardcoded secrets from leaking into Git.
-2. **Database Persistence**:
-   - Railway MySQL stores data in an attached persistent volume that survives restarts and re-deployments.
-   - `spring.jpa.hibernate.ddl-auto=update` preserves existing database rows and automatically updates table schemas safely.
-3. **Authentication Guard**:
-   - The landing page (`/index.html`) is open to the public.
-   - Student, Admin, and Recruiter dashboards enforce authentication verification via `API.requireRole(...)` and redirect unauthenticated visitors to `/login.html`.
-
----
-
-## 🔄 How to Update the Website After Changing Code
-
-Whenever you make improvements or changes to your project:
-1. Open PowerShell:
-   ```powershell
+Whenever you update code or add features:
+1. Make your changes locally.
+2. Commit and push:
+   ```bash
    git add .
-   git commit -m "Description of changes"
+   git commit -m "Add new placement feature"
    git push origin main
    ```
-2. Railway and Render listen for commits to `main` and will **automatically rebuild and redeploy** the application with zero manual intervention.
-
----
-
-## 🔍 How to View Deployment Logs
-
-1. Go to your **Railway** dashboard.
-2. Click on your project -> click on your web service card.
-3. Open the **"Deployments"** tab -> click on the active deployment.
-4. View real-time **Build Logs** (Maven package steps) and **Deploy Logs** (Spring Boot startup and SQL queries).
-
----
-
-## 🔑 Demo Login Credentials for Public Evaluators
-
-| Role | Login Name / Email | Password | Allowed Operations |
-| :--- | :--- | :--- | :--- |
-| **Admin / Placement Officer (Sri Tanavi)** | `sri` | Configured Admin Password (or `admin123` default) | Analytics dashboard, manage student database, post jobs/internships, schedule interviews, coordinate drives |
-| **Student (Demo Account)** | `student@placement.com` | `student123` | Update academic profile, browse jobs & internships, 1-click apply, live application status tracking, notifications |
-| **Student 2 (Ananya Verma)** | `ananya.verma@placement.com` | `student123` | View shortlisted application records & interview calls |
-| **Recruiter** | Register directly via `/register.html` | Your chosen password | Post company openings, review applicants |
+3. Vercel automatically detects the push, runs the TypeScript check and build, and redeploys the live site with zero downtime.

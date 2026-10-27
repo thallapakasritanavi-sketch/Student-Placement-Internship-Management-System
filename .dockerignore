@@ -1,8 +1,0 @@
-target/
-.git/
-.gitignore
-*.log
-.idea/
-*.iml
-.vscode/
-cloudflared.exe
