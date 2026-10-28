@@ -21,6 +21,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  const ensureWelcomeNotification = async (profile: UserProfile) => {
+    if (profile.role === 'STUDENT') {
+      try {
+        await api.createNotification({
+          userId: profile.id,
+          title: 'Welcome to Student Placement Portal!',
+          message: 'Your account has been created successfully. Explore available jobs and internships and start applying.',
+          type: 'WELCOME',
+          eventKey: `welcome-${profile.id}`
+        });
+      } catch (err) {
+        console.warn('Welcome notification check error:', err);
+      }
+    }
+  };
+
   useEffect(() => {
     async function initAuth() {
       try {
@@ -29,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (session?.user) {
             const profile = await api.getProfile(session.user.id);
             if (profile) {
+              await ensureWelcomeNotification(profile);
               setUser(profile);
               setLoading(false);
               return;
@@ -42,6 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const parsed = JSON.parse(stored);
           const currentProfile = await api.getProfile(parsed.id);
           if (currentProfile) {
+            await ensureWelcomeNotification(currentProfile);
             setUser(currentProfile);
           }
         }
@@ -62,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!error && data.user) {
           const profile = await api.getProfile(data.user.id);
           if (profile) {
+            await ensureWelcomeNotification(profile);
             setUser(profile);
             localStorage.setItem(CURRENT_USER_SESSION_KEY, JSON.stringify(profile));
             return profile;
@@ -83,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('User not found. Use demo login or create a new account.');
       }
 
+      await ensureWelcomeNotification(matched);
       setUser(matched);
       localStorage.setItem(CURRENT_USER_SESSION_KEY, JSON.stringify(matched));
       return matched;
@@ -136,6 +156,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await supabase.from('profiles').insert([newProfile]);
       }
 
+      // Generate welcome notification for newly registered student (deduplicated by eventKey)
+      if (params.role === 'STUDENT') {
+        try {
+          await api.createNotification({
+            userId: newProfile.id,
+            title: 'Welcome to Student Placement Portal!',
+            message: 'Your account has been created successfully. Explore available jobs and internships and start applying.',
+            type: 'WELCOME',
+            eventKey: `welcome-${newProfile.id}`
+          });
+        } catch (notifErr) {
+          console.warn('Welcome notification creation error:', notifErr);
+        }
+      }
+
       setUser(newProfile);
       localStorage.setItem(CURRENT_USER_SESSION_KEY, JSON.stringify(newProfile));
       return newProfile;
@@ -166,6 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!demoUser) throw new Error(`Demo ${role} account unavailable`);
 
+    await ensureWelcomeNotification(demoUser);
     setUser(demoUser);
     localStorage.setItem(CURRENT_USER_SESSION_KEY, JSON.stringify(demoUser));
     return demoUser;

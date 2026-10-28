@@ -138,7 +138,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onShowToast }) =
     try {
       const updated = await api.updateApplicationStatus(appId, status);
       setApplications(applications.map(a => a.id === appId ? updated : a));
-      onShowToast(`Candidate application updated to ${status}!`, 'success');
+      onShowToast(`Candidate status updated to ${status.replace('_', ' ')} (notification dispatched to student)!`, 'success');
     } catch (e: any) {
       onShowToast('Failed to update status', 'error');
     }
@@ -372,36 +372,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onShowToast }) =
                     <td className="py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
                         app.status === 'SELECTED' ? 'bg-emerald-100 text-emerald-800' :
-                        app.status === 'INTERVIEW_SCHEDULED' ? 'bg-blue-100 text-blue-800' :
+                        app.status === 'INTERVIEW_SCHEDULED' ? 'bg-purple-100 text-purple-800' :
                         app.status === 'SHORTLISTED' ? 'bg-amber-100 text-amber-800' :
+                        app.status === 'UNDER_REVIEW' ? 'bg-blue-100 text-blue-800' :
                         app.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
                         'bg-slate-100 text-slate-700'
                       }`}>
                         {app.status.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="py-4 text-right space-x-1.5">
-                      <button
-                        onClick={() => handleStatusChange(app.id, 'SHORTLISTED')}
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 hover:bg-amber-100"
-                      >
-                        Shortlist
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedApp(app);
-                          setShowInterviewModal(true);
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100"
-                      >
-                        Interview
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(app.id, 'SELECTED')}
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                      >
-                        Select
-                      </button>
+                    <td className="py-4 text-right">
+                      <div className="flex items-center justify-end space-x-1.5 flex-wrap gap-y-1">
+                        <select
+                          value={app.status}
+                          onChange={(e) => handleStatusChange(app.id, e.target.value as ApplicationStatus)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:border-slate-300 focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                        >
+                          <option value="APPLIED">Applied</option>
+                          <option value="UNDER_REVIEW">Under Review</option>
+                          <option value="SHORTLISTED">Shortlisted</option>
+                          <option value="INTERVIEW_SCHEDULED">Interview Scheduled</option>
+                          <option value="SELECTED">Selected</option>
+                          <option value="REJECTED">Rejected</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            setSelectedApp(app);
+                            setShowInterviewModal(true);
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200"
+                          title="Schedule Interview"
+                        >
+                          Interview
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

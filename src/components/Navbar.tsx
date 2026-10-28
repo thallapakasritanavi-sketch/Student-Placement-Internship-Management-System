@@ -13,9 +13,11 @@ import {
   ChevronDown
 } from 'lucide-react';
 
+import { NotificationBell } from './NotificationBell';
+
 interface NavbarProps {
   currentView: string;
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, extra?: { tab?: string; appId?: number }) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
@@ -89,6 +91,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
           <div className="hidden md:flex items-center space-x-3">
             {user ? (
               <div className="flex items-center space-x-3 border-l border-slate-200 pl-4">
+                <NotificationBell onNavigate={onNavigate} />
+
                 <div className="flex items-center space-x-2 text-right">
                   <div>
                     <span className="text-sm font-semibold text-slate-800 block leading-tight">
@@ -191,8 +195,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             )}
           </div>
 
-          {/* Mobile menu toggle */}
-          <div className="flex md:hidden items-center">
+          {/* Mobile Right Actions */}
+          <div className="flex md:hidden items-center space-x-1">
+            {user && <NotificationBell onNavigate={onNavigate} />}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -219,6 +224,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
                 className="w-full text-left px-3 py-2 rounded-lg text-base font-medium text-blue-600 bg-blue-50 font-semibold"
               >
                 Go to Dashboard ({user.role})
+              </button>
+              <button
+                onClick={() => { onNavigate('notifications'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between"
+              >
+                <span>Notification Centre</span>
               </button>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                 <div>

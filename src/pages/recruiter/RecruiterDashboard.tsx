@@ -85,7 +85,7 @@ export const RecruiterDashboard: React.FC<RecruiterDashboardProps> = ({ onShowTo
     try {
       const updated = await api.updateApplicationStatus(appId, status);
       setApplications(applications.map(a => a.id === appId ? updated : a));
-      onShowToast(`Applicant status marked as ${status}!`, 'success');
+      onShowToast(`Applicant status marked as ${status.replace('_', ' ')} (notification sent to candidate)!`, 'success');
     } catch (e: any) {
       onShowToast('Failed to update status', 'error');
     }
@@ -187,32 +187,29 @@ export const RecruiterDashboard: React.FC<RecruiterDashboardProps> = ({ onShowTo
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
                         app.status === 'SELECTED' ? 'bg-emerald-100 text-emerald-800' :
                         app.status === 'SHORTLISTED' ? 'bg-amber-100 text-amber-800' :
-                        app.status === 'INTERVIEW_SCHEDULED' ? 'bg-blue-100 text-blue-800' :
+                        app.status === 'UNDER_REVIEW' ? 'bg-blue-100 text-blue-800' :
+                        app.status === 'INTERVIEW_SCHEDULED' ? 'bg-purple-100 text-purple-800' :
                         app.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
                         'bg-slate-100 text-slate-700'
                       }`}>
                         {app.status.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="py-4 text-right space-x-1.5">
-                      <button
-                        onClick={() => handleUpdateStatus(app.id, 'SHORTLISTED')}
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 hover:bg-amber-100"
-                      >
-                        Shortlist
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus(app.id, 'SELECTED')}
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                      >
-                        Hire
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus(app.id, 'REJECTED')}
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100"
-                      >
-                        Reject
-                      </button>
+                    <td className="py-4 text-right">
+                      <div className="flex items-center justify-end space-x-1.5 flex-wrap gap-1">
+                        <select
+                          value={app.status}
+                          onChange={(e) => handleUpdateStatus(app.id, e.target.value as ApplicationStatus)}
+                          className="px-2 py-1 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-700 cursor-pointer"
+                        >
+                          <option value="APPLIED">Applied</option>
+                          <option value="UNDER_REVIEW">Under Review</option>
+                          <option value="SHORTLISTED">Shortlisted</option>
+                          <option value="INTERVIEW_SCHEDULED">Interview Scheduled</option>
+                          <option value="SELECTED">Hire</option>
+                          <option value="REJECTED">Reject</option>
+                        </select>
+                      </div>
                     </td>
                   </tr>
                 ))}

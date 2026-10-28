@@ -51,7 +51,7 @@ export interface Internship {
   createdAt?: string;
 }
 
-export type ApplicationStatus = 'APPLIED' | 'SHORTLISTED' | 'INTERVIEW_SCHEDULED' | 'SELECTED' | 'REJECTED';
+export type ApplicationStatus = 'APPLIED' | 'UNDER_REVIEW' | 'SHORTLISTED' | 'INTERVIEW_SCHEDULED' | 'SELECTED' | 'REJECTED';
 
 export interface Application {
   id: number;
@@ -98,11 +98,24 @@ export interface Interview {
   createdAt?: string;
 }
 
+export type NotificationType = 
+  | 'WELCOME' 
+  | 'APPLICATION_SUBMITTED' 
+  | 'STATUS_CHANGE' 
+  | 'INTERVIEW_SCHEDULED' 
+  | 'GENERAL';
+
 export interface NotificationItem {
-  id: number;
+  id: number | string;
   userId: string;
   title: string;
   message: string;
+  type: NotificationType;
+  relatedApplicationId?: number;
+  relatedJobId?: number;
+  relatedInternshipId?: number;
   isRead: boolean;
   createdAt: string;
+  readAt?: string;
+  eventKey?: string;
 }

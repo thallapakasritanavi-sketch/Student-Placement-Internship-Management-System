@@ -1,7 +1,22 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { UserProfile, Job, Internship, Application, PlacementDrive, Interview, NotificationItem, ApplicationStatus } from '../types';
+import { UserProfile, Job, Internship, Application, PlacementDrive, Interview, NotificationItem, ApplicationStatus, NotificationType } from '../types';
 
 const STORAGE_KEY = 'spims_mock_store_v1';
+export const NOTIFICATIONS_UPDATED_EVENT = 'spims-notifications-updated';
+
+export function broadcastNotificationsUpdated() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(NOTIFICATIONS_UPDATED_EVENT));
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY) {
+      broadcastNotificationsUpdated();
+    }
+  });
+}
 
 // Initial default synthetic data
 const initialData = {
@@ -266,17 +281,35 @@ const initialData = {
     {
       id: 1,
       userId: 'student-demo',
-      title: 'Application Shortlisted',
-      message: 'Congratulations! Google has shortlisted your application for Software Engineer.',
-      isRead: false,
-      createdAt: '2026-10-21T11:00:00Z'
+      title: 'Welcome to Student Placement Portal!',
+      message: 'Your account has been created successfully. Explore available jobs and internships and start applying.',
+      type: 'WELCOME',
+      isRead: true,
+      eventKey: 'welcome-student-demo',
+      createdAt: '2026-10-20T08:00:00Z'
     },
     {
       id: 2,
       userId: 'student-demo',
-      title: 'Interview Scheduled',
-      message: 'Microsoft has scheduled Technical Round 1 for 05 Nov 2026 at 11:00 AM IST.',
+      title: 'Application Shortlisted',
+      message: 'Congratulations! You have been shortlisted for Software Engineer - Campus 2026 at Google.',
+      type: 'STATUS_CHANGE',
+      relatedApplicationId: 1,
+      relatedJobId: 1,
       isRead: false,
+      eventKey: 'status-update-1-SHORTLISTED-init',
+      createdAt: '2026-10-21T11:00:00Z'
+    },
+    {
+      id: 3,
+      userId: 'student-demo',
+      title: 'Interview Scheduled',
+      message: 'An interview has been scheduled for Cloud Solutions Engineer at Microsoft (Technical Round 1). Please check your application details.',
+      type: 'INTERVIEW_SCHEDULED',
+      relatedApplicationId: 2,
+      relatedJobId: 2,
+      isRead: false,
+      eventKey: 'interview-sched-2-init',
       createdAt: '2026-10-23T15:30:00Z'
     }
   ] as NotificationItem[]
@@ -298,6 +331,7 @@ function getLocalStore() {
 function saveLocalStore(data: typeof initialData) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    broadcastNotificationsUpdated();
   } catch (err) {
     console.error('Failed to save to local store:', err);
   }
@@ -454,7 +488,7 @@ export const api = {
   }): Promise<Application> {
     const store = getLocalStore();
     
-    // Check duplicate
+    // Check duplicate application
     const exists = store.applications.some((a: Application) => 
       a.studentId === applicationData.studentId && 
       ((applicationData.jobId && a.jobId === applicationData.jobId) || 
@@ -483,11 +517,20 @@ export const api = {
     store.applications.unshift(newApp);
     saveLocalStore(store);
 
-    // Create confirmation notification
+    // Create persistent confirmation notification for student
+    const dedupeKey = applicationData.type === 'JOB'
+      ? `app-submit-job-${applicationData.studentId}-${applicationData.jobId}`
+      : `app-submit-internship-${applicationData.studentId}-${applicationData.internshipId}`;
+
     await api.createNotification({
       userId: applicationData.studentId,
       title: 'Application Submitted',
-      message: `Your application for ${applicationData.jobTitle} at ${applicationData.companyName} was successfully submitted.`
+      message: `Your application for ${applicationData.jobTitle} has been submitted successfully.`,
+      type: 'APPLICATION_SUBMITTED',
+      relatedApplicationId: newApp.id,
+      relatedJobId: applicationData.jobId,
+      relatedInternshipId: applicationData.internshipId,
+      eventKey: dedupeKey
     });
 
     return newApp;
@@ -498,21 +541,60 @@ export const api = {
     const app = store.applications.find((a: Application) => a.id === id);
     if (!app) throw new Error('Application not found');
 
+    // Only proceed and notify if status or notes actually changed
+    if (app.status === status && (!notes || app.notes === notes)) {
+      return app;
+    }
+
+    const oldStatus = app.status;
+    const isStatusChanged = oldStatus !== status;
+
     app.status = status;
     if (notes) app.notes = notes;
 
     if (isSupabaseConfigured && supabase) {
-      await supabase.from('applications').update({ status, notes }).eq('id', id);
+      try {
+        await supabase.from('applications').update({ status, notes }).eq('id', id);
+      } catch (err) {
+        console.warn('Supabase update status failed, updated local cache', err);
+      }
     }
 
     saveLocalStore(store);
 
-    // Notify student
-    await api.createNotification({
-      userId: app.studentId,
-      title: `Application Status: ${status.replace('_', ' ')}`,
-      message: `Your application for ${app.jobTitle} at ${app.companyName} has been updated to ${status}.`
-    });
+    // Notify student only if status actually changed
+    if (isStatusChanged) {
+      let notifTitle = 'Application Status Updated';
+      let notifMessage = `Your application status for ${app.jobTitle} has been updated to ${status.replace('_', ' ')}.`;
+
+      if (status === 'UNDER_REVIEW') {
+        notifTitle = 'Application Under Review';
+        notifMessage = `Your application for ${app.jobTitle} is now Under Review.`;
+      } else if (status === 'SHORTLISTED') {
+        notifTitle = 'Application Shortlisted';
+        notifMessage = `Congratulations! You have been shortlisted for ${app.jobTitle}.`;
+      } else if (status === 'INTERVIEW_SCHEDULED') {
+        notifTitle = 'Interview Scheduled';
+        notifMessage = `An interview has been scheduled for ${app.jobTitle}. Please check your application details.`;
+      } else if (status === 'SELECTED') {
+        notifTitle = 'Selected for Position!';
+        notifMessage = `Congratulations! You have been selected for ${app.jobTitle}!`;
+      } else if (status === 'REJECTED') {
+        notifTitle = 'Application Status Updated';
+        notifMessage = `Your application status for ${app.jobTitle} has been updated to Rejected.`;
+      }
+
+      await api.createNotification({
+        userId: app.studentId,
+        title: notifTitle,
+        message: notifMessage,
+        type: 'STATUS_CHANGE',
+        relatedApplicationId: app.id,
+        relatedJobId: app.jobId,
+        relatedInternshipId: app.internshipId,
+        eventKey: `status-update-${app.id}-${status}-${Date.now()}`
+      });
+    }
 
     return app;
   },
@@ -569,11 +651,14 @@ export const api = {
     // Also update application status
     await api.updateApplicationStatus(interview.applicationId, 'INTERVIEW_SCHEDULED', `Round: ${interview.roundName}`);
 
-    // Notify student
+    // Detailed interview notification for student
     await api.createNotification({
       userId: interview.studentId,
       title: 'Interview Scheduled',
-      message: `${interview.companyName} has scheduled ${interview.roundName} on ${interview.interviewDate} at ${interview.interviewTime}.`
+      message: `An interview has been scheduled for ${interview.companyName} (${interview.roundName}) on ${interview.interviewDate} at ${interview.interviewTime}. Please check your application details.`,
+      type: 'INTERVIEW_SCHEDULED',
+      relatedApplicationId: interview.applicationId,
+      eventKey: `interview-sched-${interview.applicationId}-${interview.roundName}`
     });
 
     return newInterview;
@@ -581,31 +666,203 @@ export const api = {
 
   // Notifications
   async getNotifications(userId: string): Promise<NotificationItem[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          return data.map((n: any) => ({
+            id: n.id,
+            userId: n.user_id,
+            title: n.title,
+            message: n.message,
+            type: (n.type as NotificationType) || 'GENERAL',
+            relatedApplicationId: n.related_application_id,
+            isRead: Boolean(n.is_read),
+            readAt: n.read_at,
+            eventKey: n.event_key,
+            createdAt: n.created_at
+          }));
+        }
+      } catch (err) {
+        console.warn('Supabase getNotifications failed, falling back to local store', err);
+      }
+    }
+
     const store = getLocalStore();
-    return store.notifications.filter((n: NotificationItem) => n.userId === userId);
+    return (store.notifications || [])
+      .filter((n: NotificationItem) => n.userId === userId)
+      .sort((a: NotificationItem, b: NotificationItem) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
   },
 
-  async createNotification(notif: { userId: string; title: string; message: string }): Promise<void> {
+  async getUnreadCount(userId: string): Promise<number> {
+    const list = await api.getNotifications(userId);
+    return list.filter(n => !n.isRead).length;
+  },
+
+  async createNotification(notif: {
+    userId: string;
+    title: string;
+    message: string;
+    type?: NotificationType;
+    relatedApplicationId?: number;
+    relatedJobId?: number;
+    relatedInternshipId?: number;
+    eventKey?: string;
+  }): Promise<NotificationItem | null> {
     const store = getLocalStore();
-    const item: NotificationItem = {
+    store.notifications = store.notifications || [];
+
+    // Deduplication check: if eventKey matches existing notification, return it
+    if (notif.eventKey) {
+      const existing = store.notifications.find((n: NotificationItem) => n.eventKey === notif.eventKey);
+      if (existing) {
+        return existing;
+      }
+    }
+
+    const newItem: NotificationItem = {
       id: Date.now(),
       userId: notif.userId,
       title: notif.title,
       message: notif.message,
+      type: notif.type || 'GENERAL',
+      relatedApplicationId: notif.relatedApplicationId,
+      relatedJobId: notif.relatedJobId,
+      relatedInternshipId: notif.relatedInternshipId,
       isRead: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      eventKey: notif.eventKey
     };
-    store.notifications.unshift(item);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('notifications').insert([{
+          user_id: newItem.userId,
+          title: newItem.title,
+          message: newItem.message,
+          type: newItem.type,
+          related_application_id: newItem.relatedApplicationId,
+          is_read: false,
+          event_key: newItem.eventKey
+        }]).select().maybeSingle();
+
+        if (!error && data) {
+          newItem.id = data.id;
+        }
+      } catch (err) {
+        console.warn('Supabase insert notification error:', err);
+      }
+    }
+
+    store.notifications.unshift(newItem);
     saveLocalStore(store);
+    broadcastNotificationsUpdated();
+    return newItem;
   },
 
-  async markNotificationRead(id: number): Promise<void> {
+  async markNotificationRead(id: number | string, userId: string): Promise<void> {
     const store = getLocalStore();
-    const n = store.notifications.find((notif: NotificationItem) => notif.id === id);
-    if (n) {
-      n.isRead = true;
+    const item = (store.notifications || []).find((n: NotificationItem) => String(n.id) === String(id) && n.userId === userId);
+    if (item) {
+      item.isRead = true;
+      item.readAt = new Date().toISOString();
       saveLocalStore(store);
     }
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('notifications')
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .eq('id', id)
+          .eq('user_id', userId);
+      } catch (err) {
+        console.warn('Supabase markNotificationRead error:', err);
+      }
+    }
+
+    broadcastNotificationsUpdated();
+  },
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    const store = getLocalStore();
+    let changed = false;
+    (store.notifications || []).forEach((n: NotificationItem) => {
+      if (n.userId === userId && !n.isRead) {
+        n.isRead = true;
+        n.readAt = new Date().toISOString();
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      saveLocalStore(store);
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('notifications')
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .eq('user_id', userId)
+          .eq('is_read', false);
+      } catch (err) {
+        console.warn('Supabase markAllNotificationsRead error:', err);
+      }
+    }
+
+    broadcastNotificationsUpdated();
+  },
+
+  async deleteNotification(id: number | string, userId: string): Promise<void> {
+    const store = getLocalStore();
+    store.notifications = (store.notifications || []).filter(
+      (n: NotificationItem) => !(String(n.id) === String(id) && n.userId === userId)
+    );
+    saveLocalStore(store);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('notifications')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', userId);
+      } catch (err) {
+        console.warn('Supabase deleteNotification error:', err);
+      }
+    }
+
+    broadcastNotificationsUpdated();
+  },
+
+  async clearAllReadNotifications(userId: string): Promise<void> {
+    const store = getLocalStore();
+    store.notifications = (store.notifications || []).filter(
+      (n: NotificationItem) => !(n.userId === userId && n.isRead)
+    );
+    saveLocalStore(store);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('notifications')
+          .delete()
+          .eq('user_id', userId)
+          .eq('is_read', true);
+      } catch (err) {
+        console.warn('Supabase clearAllReadNotifications error:', err);
+      }
+    }
+
+    broadcastNotificationsUpdated();
   },
 
   // Storage / Resume upload

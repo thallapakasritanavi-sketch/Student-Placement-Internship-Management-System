@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS public.applications (
     student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     job_id BIGINT REFERENCES public.jobs(id) ON DELETE CASCADE,
     internship_id BIGINT REFERENCES public.internships(id) ON DELETE CASCADE,
-    status TEXT NOT NULL DEFAULT 'APPLIED' CHECK (status IN ('APPLIED', 'SHORTLISTED', 'INTERVIEW_SCHEDULED', 'SELECTED', 'REJECTED')),
+    status TEXT NOT NULL DEFAULT 'APPLIED' CHECK (status IN ('APPLIED', 'UNDER_REVIEW', 'SHORTLISTED', 'INTERVIEW_SCHEDULED', 'SELECTED', 'REJECTED')),
     notes TEXT,
     applied_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT chk_application_target CHECK (
@@ -112,9 +112,16 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     message TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'GENERAL' CHECK (type IN ('WELCOME', 'APPLICATION_SUBMITTED', 'STATUS_CHANGE', 'INTERVIEW_SCHEDULED', 'GENERAL')),
+    related_application_id BIGINT REFERENCES public.applications(id) ON DELETE SET NULL,
     is_read BOOLEAN DEFAULT FALSE,
+    read_at TIMESTAMPTZ,
+    event_key TEXT UNIQUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON public.notifications(user_id) WHERE is_read = FALSE;
 
 -- ==============================================================================
 -- Row-Level Security (RLS) Configuration
@@ -235,10 +242,84 @@ CREATE POLICY "Admins and Recruiters can manage interviews"
     USING (public.is_admin() OR public.is_recruiter());
 
 -- Notifications Policies
-CREATE POLICY "Users can view and manage their own notifications"
-    ON public.notifications FOR ALL
+CREATE POLICY "Users can view their own notifications"
+    ON public.notifications FOR SELECT
     TO authenticated
     USING (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own notifications"
+    ON public.notifications FOR UPDATE
+    TO authenticated
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users, Admins, and Recruiters can insert notifications"
+    ON public.notifications FOR INSERT
+    TO authenticated
+    WITH CHECK (user_id = auth.uid() OR public.is_admin() OR public.is_recruiter());
+
+CREATE POLICY "Users can delete their own notifications"
+    ON public.notifications FOR DELETE
+    TO authenticated
+    USING (user_id = auth.uid());
+
+-- Trigger: Automatically generate notifications on application status changes
+CREATE OR REPLACE FUNCTION public.handle_application_status_update()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_title TEXT;
+    app_target_name TEXT;
+    notif_msg TEXT;
+    e_key TEXT;
+BEGIN
+    -- Fire only when status actually changes
+    IF OLD.status IS DISTINCT FROM NEW.status THEN
+        -- Find job or internship title
+        IF NEW.job_id IS NOT NULL THEN
+            SELECT title INTO app_target_name FROM public.jobs WHERE id = NEW.job_id;
+        ELSEIF NEW.internship_id IS NOT NULL THEN
+            SELECT title INTO app_target_name FROM public.internships WHERE id = NEW.internship_id;
+        END IF;
+
+        IF app_target_name IS NULL THEN
+            app_target_name := 'your application';
+        END IF;
+
+        CASE NEW.status
+            WHEN 'UNDER_REVIEW' THEN
+                target_title := 'Application Under Review';
+                notif_msg := 'Your application for ' || app_target_name || ' is now Under Review.';
+            WHEN 'SHORTLISTED' THEN
+                target_title := 'Application Shortlisted';
+                notif_msg := 'Congratulations! You have been shortlisted for ' || app_target_name || '.';
+            WHEN 'INTERVIEW_SCHEDULED' THEN
+                target_title := 'Interview Scheduled';
+                notif_msg := 'An interview has been scheduled for ' || app_target_name || '. Please check your application details.';
+            WHEN 'SELECTED' THEN
+                target_title := 'Selected for Position!';
+                notif_msg := 'Congratulations! You have been selected for ' || app_target_name || '!';
+            WHEN 'REJECTED' THEN
+                target_title := 'Application Status Updated';
+                notif_msg := 'Your application status for ' || app_target_name || ' has been updated to Rejected.';
+            ELSE
+                target_title := 'Application Status Updated';
+                notif_msg := 'Your application status for ' || app_target_name || ' is now ' || REPLACE(NEW.status, '_', ' ') || '.';
+        END CASE;
+
+        e_key := 'status-update-' || NEW.id || '-' || NEW.status || '-' || EXTRACT(EPOCH FROM NOW())::BIGINT;
+
+        INSERT INTO public.notifications (user_id, title, message, type, related_application_id, event_key)
+        VALUES (NEW.student_id, target_title, notif_msg, 'STATUS_CHANGE', NEW.id, e_key)
+        ON CONFLICT (event_key) DO NOTHING;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_app_status_update ON public.applications;
+CREATE TRIGGER trg_app_status_update
+    AFTER UPDATE OF status ON public.applications
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_application_status_update();
 
 -- ==============================================================================
 -- Storage Setup for Resumes

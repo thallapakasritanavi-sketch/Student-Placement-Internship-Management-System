@@ -131,14 +131,148 @@ If you own a custom domain (e.g. `placements.yourcollege.edu` or `mysystem.com`)
 
 ---
 
-## 🔄 8. Ongoing Maintenance & Redeployment
+## 🔔 8. Notification System Configuration & Migration
+
+If you already have a running Supabase project from an earlier deployment, run the following SQL migration script in your Supabase **SQL Editor** to upgrade your database with notification support, deduplication keys, RLS security policies, and automatic status triggers:
+
+```sql
+-- 1. Update application status check constraint to include UNDER_REVIEW
+ALTER TABLE public.applications 
+  DROP CONSTRAINT IF EXISTS applications_status_check;
+
+ALTER TABLE public.applications 
+  ADD CONSTRAINT applications_status_check 
+  CHECK (status IN ('APPLIED', 'UNDER_REVIEW', 'SHORTLISTED', 'INTERVIEW_SCHEDULED', 'SELECTED', 'REJECTED'));
+
+-- 2. Upgrade notifications table
+ALTER TABLE public.notifications 
+  ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'GENERAL',
+  ADD COLUMN IF NOT EXISTS related_application_id BIGINT REFERENCES public.applications(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS event_key TEXT UNIQUE;
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON public.notifications(user_id) WHERE is_read = FALSE;
+
+-- 3. Row-Level Security Policies for Notifications
+DROP POLICY IF EXISTS "Users can view and manage their own notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Users can view their own notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Users, Admins, and Recruiters can insert notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Users can delete their own notifications" ON public.notifications;
+
+CREATE POLICY "Users can view their own notifications"
+    ON public.notifications FOR SELECT
+    TO authenticated
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own notifications"
+    ON public.notifications FOR UPDATE
+    TO authenticated
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users, Admins, and Recruiters can insert notifications"
+    ON public.notifications FOR INSERT
+    TO authenticated
+    WITH CHECK (user_id = auth.uid() OR public.is_admin() OR public.is_recruiter());
+
+CREATE POLICY "Users can delete their own notifications"
+    ON public.notifications FOR DELETE
+    TO authenticated
+    USING (user_id = auth.uid());
+
+-- 4. Automatic Application Status Notification Trigger
+CREATE OR REPLACE FUNCTION public.handle_application_status_update()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_title TEXT;
+    app_target_name TEXT;
+    notif_msg TEXT;
+    e_key TEXT;
+BEGIN
+    IF OLD.status IS DISTINCT FROM NEW.status THEN
+        IF NEW.job_id IS NOT NULL THEN
+            SELECT title INTO app_target_name FROM public.jobs WHERE id = NEW.job_id;
+        ELSEIF NEW.internship_id IS NOT NULL THEN
+            SELECT title INTO app_target_name FROM public.internships WHERE id = NEW.internship_id;
+        END IF;
+
+        IF app_target_name IS NULL THEN
+            app_target_name := 'your application';
+        END IF;
+
+        CASE NEW.status
+            WHEN 'UNDER_REVIEW' THEN
+                target_title := 'Application Under Review';
+                notif_msg := 'Your application for ' || app_target_name || ' is now Under Review.';
+            WHEN 'SHORTLISTED' THEN
+                target_title := 'Application Shortlisted';
+                notif_msg := 'Congratulations! You have been shortlisted for ' || app_target_name || '.';
+            WHEN 'INTERVIEW_SCHEDULED' THEN
+                target_title := 'Interview Scheduled';
+                notif_msg := 'An interview has been scheduled for ' || app_target_name || '. Please check your application details.';
+            WHEN 'SELECTED' THEN
+                target_title := 'Selected for Position!';
+                notif_msg := 'Congratulations! You have been selected for ' || app_target_name || '!';
+            WHEN 'REJECTED' THEN
+                target_title := 'Application Status Updated';
+                notif_msg := 'Your application status for ' || app_target_name || ' has been updated to Rejected.';
+            ELSE
+                target_title := 'Application Status Updated';
+                notif_msg := 'Your application status for ' || app_target_name || ' is now ' || REPLACE(NEW.status, '_', ' ') || '.';
+        END CASE;
+
+        e_key := 'status-update-' || NEW.id || '-' || NEW.status || '-' || EXTRACT(EPOCH FROM NOW())::BIGINT;
+
+        INSERT INTO public.notifications (user_id, title, message, type, related_application_id, event_key)
+        VALUES (NEW.student_id, target_title, notif_msg, 'STATUS_CHANGE', NEW.id, e_key)
+        ON CONFLICT (event_key) DO NOTHING;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_app_status_update ON public.applications;
+CREATE TRIGGER trg_app_status_update
+    AFTER UPDATE OF status ON public.applications
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_application_status_update();
+```
+
+---
+
+## 🧪 9. Verification & Multi-Account Test Guide
+
+To verify notifications across multiple accounts:
+1. **Student Registration Welcome Notification**:
+   - Go to `/login` and select **Register** as a Student.
+   - Enter a test email and password.
+   - Upon registration, notice the Bell icon in the navigation bar showing **1 unread badge**.
+   - Click the bell: verify the title *"Welcome to Student Placement Portal!"* and welcome message.
+2. **Job Application Confirmation**:
+   - As a student, click **Browse Openings** and apply for any job.
+   - A success notification is instantly created: *"Your application for [Job Title] has been submitted successfully."*
+   - Refresh the browser: notice the notification remains stored.
+3. **Internship Application Confirmation**:
+   - Apply for an internship; verify the internship application confirmation notification appears.
+4. **Admin Status Change Trigger**:
+   - Log in as **Admin (Sri Tanavi)** using 1-Click Demo or credentials.
+   - Go to **Candidate Review & Pipeline** and change the student's application status to **Under Review** or **Shortlisted**.
+   - Switch back to the student account: the bell badge updates immediately with *"Application Under Review"* or *"Congratulations! You have been shortlisted..."*.
+5. **Privacy & Access Isolation**:
+   - Switch between **Student Demo** and **Ananya Verma**: each student sees only their own notifications.
+   - Unauthorized students cannot view or modify others' applications or change application statuses.
+
+---
+
+## 🔄 10. Ongoing Maintenance & Redeployment
 
 Whenever you update code or add features:
 1. Make your changes locally.
 2. Commit and push:
    ```bash
    git add .
-   git commit -m "Add new placement feature"
+   git commit -m "Add complete notification system"
    git push origin main
    ```
 3. Vercel automatically detects the push, runs the TypeScript check and build, and redeploys the live site with zero downtime.

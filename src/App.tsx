@@ -9,6 +9,7 @@ import { StudentDashboard } from './pages/student/StudentDashboard';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { RecruiterDashboard } from './pages/recruiter/RecruiterDashboard';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 import { UserRole } from './types';
 
 function getViewFromPath(pathname: string): string {
@@ -17,6 +18,7 @@ function getViewFromPath(pathname: string): string {
   if (pathname.startsWith('/admin')) return 'admin-dashboard';
   if (pathname.startsWith('/recruiter')) return 'recruiter-dashboard';
   if (pathname.startsWith('/student')) return 'student-dashboard';
+  if (pathname === '/notifications' || pathname.startsWith('/notifications')) return 'notifications';
   return 'not-found';
 }
 
@@ -26,12 +28,15 @@ function getPathFromView(view: string): string {
   if (view === 'admin-dashboard') return '/admin/dashboard';
   if (view === 'recruiter-dashboard') return '/recruiter/dashboard';
   if (view === 'student-dashboard') return '/student/dashboard';
+  if (view === 'notifications') return '/notifications';
   return '/404';
 }
 
 const MainApp: React.FC = () => {
   const { user, loading } = useAuth();
   const [currentView, setCurrentView] = useState<string>(() => getViewFromPath(window.location.pathname));
+  const [dashboardTab, setDashboardTab] = useState<'openings' | 'applications' | 'profile' | 'interviews' | 'notifications'>('openings');
+  const [highlightAppId, setHighlightAppId] = useState<number | undefined>(undefined);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   useEffect(() => {
@@ -42,7 +47,9 @@ const MainApp: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigateTo = (view: string) => {
+  const navigateTo = (view: string, extra?: { tab?: string; appId?: number }) => {
+    if (extra?.tab) setDashboardTab(extra.tab as any);
+    if (extra?.appId) setHighlightAppId(extra.appId);
     setCurrentView(view);
     const newPath = getPathFromView(view);
     if (window.location.pathname !== newPath) {
@@ -74,6 +81,8 @@ const MainApp: React.FC = () => {
     renderedView = 'auth';
   } else if (currentView === 'student-dashboard' && user?.role !== 'STUDENT') {
     renderedView = 'auth';
+  } else if (currentView === 'notifications' && !user) {
+    renderedView = 'auth';
   }
 
   return (
@@ -88,13 +97,21 @@ const MainApp: React.FC = () => {
           <AuthPage onNavigate={navigateTo} />
         )}
         {renderedView === 'student-dashboard' && (
-          <StudentDashboard onShowToast={showToast} />
+          <StudentDashboard 
+            onShowToast={showToast} 
+            onNavigate={navigateTo} 
+            initialTab={dashboardTab}
+            highlightAppId={highlightAppId}
+          />
         )}
         {renderedView === 'admin-dashboard' && (
           <AdminDashboard onShowToast={showToast} />
         )}
         {renderedView === 'recruiter-dashboard' && (
           <RecruiterDashboard onShowToast={showToast} />
+        )}
+        {renderedView === 'notifications' && (
+          <NotificationsPage onNavigate={navigateTo} onShowToast={showToast} />
         )}
         {renderedView === 'not-found' && (
           <NotFoundPage onNavigateHome={() => navigateTo('landing')} />

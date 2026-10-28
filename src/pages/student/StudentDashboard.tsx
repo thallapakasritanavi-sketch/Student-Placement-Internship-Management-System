@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Job, Internship, Application, Interview, NotificationItem } from '../../types';
-import { api } from '../../services/api';
+import { Job, Internship, Application, Interview, NotificationItem, ApplicationStatus } from '../../types';
+import { api, NOTIFICATIONS_UPDATED_EVENT } from '../../services/api';
 import { 
   Briefcase, 
   User, 
@@ -9,6 +9,8 @@ import {
   Calendar, 
   Bell, 
   CheckCircle, 
+  Check,
+  CheckCheck,
   Clock, 
   Upload, 
   ExternalLink, 
@@ -18,16 +20,25 @@ import {
   MapPin,
   Award,
   Search,
-  Filter
+  Filter,
+  Sparkles
 } from 'lucide-react';
 
 interface StudentDashboardProps {
   onShowToast: (text: string, type: 'success' | 'error' | 'info') => void;
+  onNavigate?: (view: string, extra?: { tab?: string; appId?: number }) => void;
+  initialTab?: 'openings' | 'applications' | 'profile' | 'interviews' | 'notifications';
+  highlightAppId?: number;
 }
 
-export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onShowToast }) => {
+export const StudentDashboard: React.FC<StudentDashboardProps> = ({ 
+  onShowToast, 
+  onNavigate,
+  initialTab = 'openings',
+  highlightAppId 
+}) => {
   const { user, updateCurrentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'openings' | 'applications' | 'profile' | 'interviews'>('openings');
+  const [activeTab, setActiveTab] = useState<'openings' | 'applications' | 'profile' | 'interviews' | 'notifications'>(initialTab);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [internships, setInternships] = useState<Internship[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -35,6 +46,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onShowToast 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [uploadingResume, setUploadingResume] = useState(false);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Profile Form State
   const [fullName, setFullName] = useState(user?.fullName || '');
@@ -49,6 +66,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onShowToast 
 
   useEffect(() => {
     loadStudentData();
+
+    const handleUpdate = () => {
+      loadStudentData();
+    };
+    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate);
   }, [user]);
 
   async function loadStudentData() {
@@ -170,21 +193,31 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onShowToast 
           </p>
         </div>
 
-        <div className="flex gap-4">
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center min-w-[100px]">
+        <div className="flex flex-wrap gap-3">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center min-w-[85px]">
             <div className="text-2xl font-black">{applications.length}</div>
             <div className="text-xs text-blue-200">Applied</div>
           </div>
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center min-w-[100px]">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center min-w-[85px]">
             <div className="text-2xl font-black text-emerald-300">
               {applications.filter(a => a.status === 'SHORTLISTED' || a.status === 'SELECTED').length}
             </div>
             <div className="text-xs text-blue-200">Shortlisted</div>
           </div>
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center min-w-[100px]">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center min-w-[85px]">
             <div className="text-2xl font-black text-amber-300">{interviews.length}</div>
             <div className="text-xs text-blue-200">Interviews</div>
           </div>
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className="bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md rounded-2xl p-4 text-center min-w-[85px] cursor-pointer group"
+          >
+            <div className="text-2xl font-black text-rose-300 flex items-center justify-center space-x-1 group-hover:scale-105 transition-transform">
+              <span>{notifications.filter(n => !n.isRead).length}</span>
+              <Bell className="h-4 w-4 inline" />
+            </div>
+            <div className="text-xs text-blue-200">Unread</div>
+          </button>
         </div>
       </div>
 
@@ -216,6 +249,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onShowToast 
         >
           <Calendar className="h-4 w-4" />
           <span>Interview Calls ({interviews.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('notifications')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+            activeTab === 'notifications' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Bell className="h-4 w-4" />
+          <span>Notifications</span>
+          {notifications.filter(n => !n.isRead).length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white leading-none">
+              {notifications.filter(n => !n.isRead).length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('profile')}
@@ -400,7 +447,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onShowToast 
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {applications.map((app) => (
-                    <tr key={app.id} className="hover:bg-slate-50/50">
+                    <tr 
+                      key={app.id} 
+                      className={`hover:bg-slate-50/50 transition-colors ${
+                        highlightAppId === app.id ? 'bg-blue-50/80 ring-2 ring-blue-500/30' : ''
+                      }`}
+                    >
                       <td className="py-4">
                         <div className="font-bold text-slate-900">{app.jobTitle}</div>
                         <div className="text-xs text-slate-500">{app.companyName}</div>
@@ -416,8 +468,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onShowToast 
                       <td className="py-4">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                           app.status === 'SELECTED' ? 'bg-emerald-100 text-emerald-800' :
-                          app.status === 'INTERVIEW_SCHEDULED' ? 'bg-blue-100 text-blue-800' :
+                          app.status === 'INTERVIEW_SCHEDULED' ? 'bg-purple-100 text-purple-800' :
                           app.status === 'SHORTLISTED' ? 'bg-amber-100 text-amber-800' :
+                          app.status === 'UNDER_REVIEW' ? 'bg-blue-100 text-blue-800' :
                           app.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
                           'bg-slate-100 text-slate-700'
                         }`}>
@@ -482,6 +535,135 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onShowToast 
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Notifications */}
+      {activeTab === 'notifications' && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">Career Alerts & Notifications</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Stay updated on your registration, applications, shortlist status, and interviews.</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              {notifications.some(n => !n.isRead) && (
+                <button
+                  onClick={async () => {
+                    if (!user) return;
+                    await api.markAllNotificationsRead(user.id);
+                    setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+                    onShowToast('All notifications marked as read', 'success');
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 flex items-center space-x-1 transition-colors"
+                >
+                  <CheckCheck className="h-3.5 w-3.5" />
+                  <span>Mark All Read</span>
+                </button>
+              )}
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate('notifications')}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center space-x-1 transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Full View</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {notifications.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>You have no notifications right now.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {notifications.map((notif) => {
+                const isUnread = !notif.isRead;
+                return (
+                  <div
+                    key={notif.id}
+                    className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                      isUnread ? 'bg-blue-50/40 border-blue-200 shadow-xs' : 'bg-slate-50/50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-start space-x-3.5">
+                      <div className={`p-2 rounded-xl mt-0.5 shrink-0 ${
+                        notif.type === 'WELCOME' ? 'bg-amber-100 text-amber-700' :
+                        notif.type === 'APPLICATION_SUBMITTED' ? 'bg-blue-100 text-blue-700' :
+                        notif.type === 'INTERVIEW_SCHEDULED' ? 'bg-purple-100 text-purple-700' :
+                        notif.type === 'STATUS_CHANGE' ? 'bg-emerald-100 text-emerald-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {notif.type === 'WELCOME' && <Sparkles className="h-4 w-4" />}
+                        {notif.type === 'APPLICATION_SUBMITTED' && <Briefcase className="h-4 w-4" />}
+                        {notif.type === 'INTERVIEW_SCHEDULED' && <Calendar className="h-4 w-4" />}
+                        {notif.type === 'STATUS_CHANGE' && <Award className="h-4 w-4" />}
+                        {notif.type === 'GENERAL' && <AlertCircle className="h-4 w-4" />}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className={`text-sm ${isUnread ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>
+                            {notif.title}
+                          </h4>
+                          {isUnread && (
+                            <span className="px-1.5 py-0.2 rounded-sm text-[10px] font-black uppercase bg-blue-100 text-blue-700">
+                              New
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">{notif.message}</p>
+                        <div className="text-[11px] text-slate-400">
+                          {new Date(notif.createdAt).toLocaleString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 self-end sm:self-center shrink-0">
+                      {isUnread && (
+                        <button
+                          onClick={async () => {
+                            if (!user) return;
+                            await api.markNotificationRead(notif.id, user.id);
+                            setNotifications(notifications.map(n => String(n.id) === String(notif.id) ? { ...n, isRead: true } : n));
+                            onShowToast('Marked as read', 'success');
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:text-blue-600 hover:bg-slate-50 transition-colors flex items-center space-x-1"
+                        >
+                          <Check className="h-3 w-3" />
+                          <span>Mark Read</span>
+                        </button>
+                      )}
+                      {(notif.relatedApplicationId || notif.type === 'APPLICATION_SUBMITTED' || notif.type === 'STATUS_CHANGE') && (
+                        <button
+                          onClick={() => setActiveTab('applications')}
+                          className="px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          View Application
+                        </button>
+                      )}
+                      {notif.type === 'INTERVIEW_SCHEDULED' && (
+                        <button
+                          onClick={() => setActiveTab('interviews')}
+                          className="px-2.5 py-1 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        >
+                          View Interview
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
